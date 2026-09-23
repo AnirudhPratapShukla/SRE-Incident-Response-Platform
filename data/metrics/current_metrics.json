@@ -1,0 +1,23 @@
+{
+    "order-api": {
+        "cpu_usage": "92%",
+        "memory_usage": "78%",
+        "latency": "4.8 seconds",
+        "error_rate": "35%",
+        "status": "Critical"
+    },
+    "payment-api": {
+        "cpu_usage": "82%",
+        "memory_usage": "81%",
+        "latency": "5.1 seconds",
+        "error_rate": "28%",
+        "status": "Critical"
+    },
+    "inventory-api": {
+        "cpu_usage": "91%",
+        "memory_usage": "74%",
+        "latency": "4.6 seconds",
+        "error_rate": "33%",
+        "status": "Critical"
+    }
+}

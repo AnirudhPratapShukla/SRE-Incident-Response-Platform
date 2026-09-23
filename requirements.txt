@@ -1,0 +1,14 @@
+﻿langchain==1.4.0
+langgraph==1.2.11
+langchain-ollama==1.1.0
+langchain-google-genai==4.4.0
+google-genai==2.23.0
+pinecone==10.0.0
+python-dotenv==1.2.3
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+boto3==1.43.94
+langgraph-checkpoint-sqlite==3.1.1
+sqlite-vec==0.1.9
+aiosqlite==0.22.1

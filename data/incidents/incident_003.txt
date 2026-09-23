@@ -1,0 +1,35 @@
+INCIDENT ID: INC-003
+
+SERVICE: inventory-api
+
+DATE: 2026-08-28
+
+SEVERITY: SEV-2
+
+SYMPTOMS:
+The inventory-api experienced elevated response latency
+and intermittent HTTP 500 errors.
+
+METRICS:
+CPU utilization: 91%
+Memory utilization: 74%
+API latency: 4.6 seconds
+Error rate: 33%
+
+LOGS:
+Unable to acquire database connection
+Database connection timeout
+Connection pool exhausted
+
+ROOT CAUSE:
+Database connection pool exhaustion caused requests to
+fail when connections were unavailable.
+
+RESOLUTION:
+Connection pool configuration was increased and database
+connection handling was optimized.
+
+PREVENTION:
+Monitor connection pool usage.
+Add database connection alerts.
+Review database connection configuration after deployments.

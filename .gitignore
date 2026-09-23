@@ -1,0 +1,37 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables / secrets
+.env
+
+# SQLite runtime database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated runtime logs
+logs/
+*.log
+
+# Keep the sample application log used by the project
+!data/logs/application.log
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/

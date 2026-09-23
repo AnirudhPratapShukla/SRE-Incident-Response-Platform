@@ -1,0 +1,35 @@
+INCIDENT ID: INC-002
+
+SERVICE: payment-api
+
+DATE: 2026-08-20
+
+SEVERITY: SEV-1
+
+SYMPTOMS:
+The payment-api service returned HTTP 500 errors.
+Requests experienced high latency.
+
+METRICS:
+CPU utilization: 82%
+Memory utilization: 81%
+API latency: 5.1 seconds
+Error rate: 28%
+
+LOGS:
+Database connection timeout
+Connection acquisition failed
+Connection pool limit reached
+
+ROOT CAUSE:
+The application exhausted available database connections
+during a traffic spike.
+
+RESOLUTION:
+Database connection pool capacity was increased.
+Database connection usage was optimized.
+
+PREVENTION:
+Add monitoring for active database connections.
+Configure alerts when the connection pool approaches capacity.
+Perform load testing before major releases.

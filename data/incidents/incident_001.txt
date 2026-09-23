@@ -1,0 +1,37 @@
+INCIDENT ID: INC-001
+
+SERVICE: order-api
+
+DATE: 2026-08-12
+
+SEVERITY: SEV-2
+
+SYMPTOMS:
+The order-api service experienced HTTP 500 errors.
+API latency increased significantly.
+Database requests started timing out.
+
+METRICS:
+CPU utilization: 89%
+Memory utilization: 76%
+API latency: 4.2 seconds
+Error rate: 31%
+
+LOGS:
+Database connection timeout
+Unable to acquire database connection
+Connection pool exhausted
+
+ROOT CAUSE:
+The application database connection pool was exhausted.
+A recent deployment increased the number of concurrent
+database requests without increasing the connection pool.
+
+RESOLUTION:
+The database connection pool size was increased.
+Application connection timeout settings were reviewed.
+
+PREVENTION:
+Monitor database connection pool utilization.
+Add alerts for connection pool exhaustion.
+Validate connection pool configuration during deployments.

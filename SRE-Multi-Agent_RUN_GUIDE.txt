@@ -1,0 +1,728 @@
+SRE MULTI-AGENT v1.0 DEMO / RUN GUIDE =================
+
+GitHub: https://github.com/AnirudhPratapShukla/SRE-Multi-Agent
+
+Purpose
+
+This guide is for demonstrating the SRE Multi-Agent project from a fresh
+PowerShell session. It contains the commands needed to set up the
+project, configure dependencies, start Ollama, prepare the RAG data, run
+the CLI/API, approve a remediation, and run the test suite.
+
+IMPORTANT
+
+1.  Never show or share the real .env file or API keys.
+2.  Keep GOOGLE_API_KEY and PINECONE_API_KEY private.
+3.  The v1.0 remediation layer is planning-only and does not make
+    production infrastructure changes.
+4.  The expensive Ollama/RAG end-to-end workflow does not need to be run
+    for every code change.
+5.  This guide assumes the repository is already pushed to GitHub.
+
+====================================================================== 1.
+PREREQUISITES
+======================================================================
+
+Required: - Git - Python 3.13 - Ollama - Google Gemini API key -
+Pinecone API key - Internet connection
+
+Optional: - Docker - Postman / browser for API testing
+
+Check versions:
+
+    git --version
+    python --version
+    pip --version
+    ollama --version
+
+Expected Python version for this project: Python 3.13.x
+
+======================================================================
+2. CLONE THE PROJECT FROM SCRATCH
+======================================================================
+
+Open PowerShell and choose the folder where you want the project.
+
+Example:
+
+    cd "D:\Cloudsoft Practice\All_Resource"
+
+Clone:
+
+    git clone git@github.com:AnirudhPratapShukla/SRE-Multi-Agent.git
+
+Enter the project:
+
+    cd "D:\Cloudsoft Practice\All_Resource\SRE-Multi-Agent"
+
+Check:
+
+    git status
+
+Expected branch:
+
+    main
+
+======================================================================
+3. CREATE AND ACTIVATE VIRTUAL ENVIRONMENT
+======================================================================
+
+Create:
+
+    python -m venv venv
+
+Activate:
+
+    .\venv\Scripts\Activate.ps1
+
+You should see:
+
+    (venv) PS D:\...\SRE-Multi-Agent>
+
+If PowerShell blocks activation, use this only if required:
+
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+Then:
+
+    .\venv\Scripts\Activate.ps1
+
+======================================================================
+4. INSTALL PYTHON DEPENDENCIES
+======================================================================
+
+Run:
+
+    python -m pip install --upgrade pip
+
+Then:
+
+    pip install -r requirements.txt
+
+Verify important packages:
+
+    pip show langgraph
+    pip show langchain
+    pip show langchain-ollama
+    pip show pinecone
+    pip show fastapi
+
+======================================================================
+5. CONFIGURE ENVIRONMENT VARIABLES
+======================================================================
+
+The repository contains:
+
+    .env.example
+
+Create the real .env file.
+
+PowerShell:
+
+    Copy-Item .env.example .env
+
+Open it:
+
+    notepad .env
+
+Set the values:
+
+    GOOGLE_API_KEY=your_google_api_key
+    PINECONE_API_KEY=your_pinecone_api_key
+    PINECONE_INDEX_NAME=devops-rag
+    PINECONE_NAMESPACE=sre-incidents
+    GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+
+IMPORTANT: - Do not commit .env. - Do not paste API keys into GitHub. -
+.env is already included in .gitignore.
+
+======================================================================
+6. VERIFY PINECONE CONFIGURATION
+======================================================================
+
+The project uses the existing Pinecone index:
+
+    devops-rag
+
+The SRE project isolates its vectors using:
+
+    Namespace: sre-incidents
+
+Embedding model:
+
+    gemini-embedding-001
+
+Embedding dimension:
+
+    768
+
+Do not change the embedding dimension unless the Pinecone index is also
+configured to use the same dimension.
+
+======================================================================
+7. PREPARE OLLAMA
+======================================================================
+
+Check installed models:
+
+    ollama list
+
+The project currently uses:
+
+    qwen2.5:3b
+
+If it is not installed:
+
+    ollama pull qwen2.5:3b
+
+Test the model:
+
+    ollama run qwen2.5:3b
+
+You can exit the interactive model with:
+
+    /bye
+
+======================================================================
+8. START OLLAMA SERVER
+======================================================================
+
+For the full application, Ollama must be running.
+
+Open a SECOND PowerShell window.
+
+Run:
+
+    ollama serve
+
+Keep this window open.
+
+Do not close it while demonstrating the full workflow.
+
+======================================================================
+9. PREPARE / INGEST HISTORICAL INCIDENTS
+======================================================================
+
+The historical incidents are located in:
+
+    data\incidents\
+
+Check them:
+
+    Get-ChildItem .\data\incidents\
+
+The project currently contains three historical incidents.
+
+Run ingestion:
+
+    python rag\ingestion.py
+
+Expected output is similar to:
+
+    Found 3 incident files.
+    Uploaded: incident_001
+    Uploaded: incident_002
+    Uploaded: incident_003
+
+IMPORTANT: The project uses Pinecone for these vectors.
+
+If the incidents have already been ingested successfully and nothing
+changed, you do not need to run ingestion again.
+
+======================================================================
+10. DEMONSTRATE RAG RETRIEVAL
+======================================================================
+
+Run:
+
+    python rag\retrieval.py
+
+The script performs semantic search for incidents related to:
+
+    HTTP 500 errors caused by database connection pool exhaustion
+
+Expected output includes similar incident IDs and similarity scores.
+
+Example from the project:
+
+    incident_001
+    incident_002
+    incident_003
+
+This demonstrates that historical incidents are being retrieved from
+Pinecone using Gemini embeddings.
+
+======================================================================
+11. RUN THE COMPLETE CLI DEMO
+======================================================================
+
+Make sure Ollama is running in the other PowerShell window.
+
+From the project root:
+
+    python main.py
+
+The application asks for an incident and service.
+
+Use this demonstration incident:
+
+    The order-api service is returning HTTP 500 errors and requests are timing out
+
+Use this service:
+
+    order-api
+
+The workflow will run approximately as:
+
+    Incident
+        |
+        v
+    Monitoring Agent
+        |
+        v
+    Log Agent
+        |
+        v
+    Infrastructure Agent
+        |
+        v
+    RAG Agent
+        |
+        v
+    RCA Agent
+        |
+        v
+    Safety Agent
+        |
+        v
+    Human Approval
+        |
+        v
+    Remediation Agent
+        |
+        v
+    Final Report
+
+======================================================================
+12. WHAT TO EXPLAIN DURING THE DEMO
+======================================================================
+
+When showing the project to someone, explain the agents in this order.
+
+MONITORING AGENT
+
+Collects service metrics such as CPU, memory, latency and error rate.
+
+LOG AGENT
+
+Analyzes application logs and looks for database failures, connection
+timeouts, HTTP 500 errors and other runtime signals.
+
+INFRASTRUCTURE AGENT
+
+Checks simulated infrastructure health such as pod status, replica
+counts, restarts and deployment health.
+
+RAG AGENT
+
+Searches historical incidents in Pinecone using semantic similarity.
+This gives the RCA Agent previous incidents that are similar to the
+current problem.
+
+RCA AGENT
+
+Combines the current incident, metrics, logs, infrastructure information
+and historical incidents to produce a structured root-cause analysis.
+
+SAFETY AGENT
+
+Checks whether the recommended remediation is potentially destructive.
+Unsafe actions are blocked.
+
+HUMAN APPROVAL
+
+The workflow pauses and waits for an explicit human decision. The AI
+does not approve its own remediation.
+
+REMEDIATION AGENT
+
+Creates a controlled remediation plan after approval. In v1.0 it does
+not directly modify production infrastructure.
+
+======================================================================
+13. HUMAN APPROVAL DEMO
+======================================================================
+
+When the CLI reaches human approval, the system displays the proposed
+remediation.
+
+For the demonstration, enter:
+
+    yes
+
+or:
+
+    approve
+
+The workflow then continues to the remediation stage.
+
+The final execution status for an approved plan is similar to:
+
+    APPROVED - READY FOR CONTROLLED EXECUTION
+
+IMPORTANT: This status means the plan has been approved and is ready for
+controlled execution. It does NOT mean that the application has modified
+production.
+
+======================================================================
+14. SAFETY DEMO
+======================================================================
+
+The Safety Agent blocks destructive remediation patterns.
+
+Examples include:
+
+    delete database
+    drop database
+    delete production
+    terminate all
+    destroy infrastructure
+    delete infrastructure
+    remove production
+    shutdown production
+
+The purpose is to demonstrate that the AI system has a safety gate
+before human-approved remediation.
+
+======================================================================
+15. RUN THE COMPLETE LIGHTWEIGHT TEST SUITE
+======================================================================
+
+Do this after code changes and before a final demonstration:
+
+    python -m tests.run_all_tests
+
+Expected:
+
+    All tests passed.
+    Result: SUCCESS
+
+The suite covers:
+
+    tests.test_safety
+    tests.test_remediation
+    tests.test_rca
+    tests.test_workflow
+    tests.test_api
+    tests.test_observability
+
+This test suite avoids repeatedly running the expensive Ollama/Pinecone
+end-to-end workflow.
+
+======================================================================
+16. RUN THE FASTAPI DEMO
+======================================================================
+
+Keep Ollama running.
+
+Open another PowerShell window.
+
+Go to the project:
+
+    cd "D:\Cloudsoft Practice\All_Resource\SRE-Multi-Agent"
+
+Activate the environment:
+
+    .\venv\Scripts\Activate.ps1
+
+Start FastAPI:
+
+    uvicorn api.main:app --reload
+
+Open in the browser:
+
+    http://localhost:8000
+
+Health check:
+
+    http://localhost:8000/health
+
+Swagger:
+
+    http://localhost:8000/docs
+
+======================================================================
+17. API DEMO
+======================================================================
+
+Create an incident using:
+
+    POST /incident
+
+Example JSON:
+
+    {
+      "incident": "The order-api service is returning HTTP 500 errors and requests are timing out",
+      "service": "order-api"
+    }
+
+The API returns a thread ID and incident/workflow information.
+
+The workflow can then be approved using:
+
+    POST /incident/{thread_id}/approve
+
+Example JSON:
+
+    {
+      "approval": "yes"
+    }
+
+The approval endpoint resumes the interrupted workflow.
+
+======================================================================
+18. API DEMO USING POWERSHELL
+======================================================================
+
+If you want to demonstrate without Postman, use:
+
+    $body = @{
+        incident = "The order-api service is returning HTTP 500 errors and requests are timing out"
+        service  = "order-api"
+    } | ConvertTo-Json
+
+Then:
+
+    Invoke-RestMethod `
+      -Uri "http://localhost:8000/incident" `
+      -Method POST `
+      -ContentType "application/json" `
+      -Body $body
+
+Save the returned thread_id.
+
+Then approve:
+
+    $approval = @{
+        approval = "yes"
+    } | ConvertTo-Json
+
+    Invoke-RestMethod `
+      -Uri "http://localhost:8000/incident/<THREAD_ID>/approve" `
+      -Method POST `
+      -ContentType "application/json" `
+      -Body $approval
+
+======================================================================
+19. OBSERVABILITY
+======================================================================
+
+Agent execution is instrumented using:
+
+    utils\logger.py
+    utils\instrumentation.py
+
+The logs record:
+
+    Agent start
+    Agent completion
+    Duration
+    Errors
+    Human approval pause
+
+Human approval interrupts are treated as expected workflow pauses rather
+than application failures.
+
+======================================================================
+20. DOCKER DEMO
+======================================================================
+
+Build:
+
+    docker build -t sre-multi-agent .
+
+Run:
+
+    docker run -p 8000:8000 --env-file .env sre-multi-agent
+
+Open:
+
+    http://localhost:8000
+
+NOTE: The container must be able to reach the configured Ollama server
+and any required external services.
+
+======================================================================
+21. QUICK DEMO — MINIMUM COMMANDS
+======================================================================
+
+If the environment has already been configured and dependencies
+installed, the shortest demonstration is:
+
+WINDOW 1
+
+    cd "D:\Cloudsoft Practice\All_Resource\SRE-Multi-Agent"
+    .\venv\Scripts\Activate.ps1
+    ollama serve
+
+WINDOW 2
+
+    cd "D:\Cloudsoft Practice\All_Resource\SRE-Multi-Agent"
+    .\venv\Scripts\Activate.ps1
+    python main.py
+
+Enter:
+
+    Incident:
+    The order-api service is returning HTTP 500 errors and requests are timing out
+
+    Service:
+    order-api
+
+When asked for human approval:
+
+    yes
+
+======================================================================
+22. RECOMMENDED INTERVIEW DEMO FLOW
+======================================================================
+
+If demonstrating this project in an interview, use this sequence:
+
+STEP 1
+
+Show the GitHub repository and README.
+
+STEP 2
+
+Explain the architecture:
+
+    Monitoring
+       +
+    Logs
+       +
+    Infrastructure
+       +
+    RAG
+       |
+       v
+      RCA
+       |
+       v
+     Safety
+       |
+       v
+
+Human Approval | v Remediation
+
+STEP 3
+
+Show the historical incident files:
+
+    data\incidents\
+
+STEP 4
+
+Show the RAG retrieval:
+
+    python rag\retrieval.py
+
+STEP 5
+
+Run the complete incident workflow:
+
+    python main.py
+
+STEP 6
+
+Use:
+
+    order-api
+
+and:
+
+    The order-api service is returning HTTP 500 errors and requests are timing out
+
+STEP 7
+
+Explain how the agents investigate the incident.
+
+STEP 8
+
+Show the RCA produced from the collected evidence and historical
+incidents.
+
+STEP 9
+
+Explain the Safety Agent.
+
+STEP 10
+
+Approve the remediation:
+
+    yes
+
+STEP 11
+
+Show the final report and explain that v1.0 does not modify production.
+
+STEP 12
+
+Show the automated tests:
+
+    python -m tests.run_all_tests
+
+======================================================================
+23. PROJECT STATUS — v1.0
+======================================================================
+
+COMPLETE:
+
+    Multi-agent orchestration
+    Monitoring Agent
+    Log Agent
+    Infrastructure Agent
+    RAG Agent
+    Pinecone integration
+    Gemini embeddings
+    RCA Agent
+    Safety Agent
+    Human approval
+    Remediation planning
+    LangGraph workflow
+    SQLite checkpointing
+    FastAPI API
+    Observability
+    Automated tests
+    Docker support
+    GitHub repository
+    Documentation
+
+PHASE 2 — PLANNED:
+
+    AWS CloudWatch
+    Real incident detection
+    Jira incident creation
+    Jira ticket updates
+    MCP integration
+    Controlled AWS remediation
+    Post-remediation verification
+    Jira resolution
+
+======================================================================
+24. IMPORTANT SAFETY NOTE
+======================================================================
+
+This project is an engineering/learning implementation of an AI-assisted
+SRE incident response workflow.
+
+Some monitoring, log and infrastructure data in v1.0 is simulated.
+
+The current remediation implementation is planning-only.
+
+No destructive production infrastructure changes are automatically
+executed by v1.0.
+
+======================================================================
+END OF RUN GUIDE
+======================================================================

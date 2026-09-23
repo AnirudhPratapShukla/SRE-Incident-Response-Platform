@@ -1,0 +1,32 @@
+{
+    "order-api": {
+        "environment": "production",
+        "instance_status": "running",
+        "pod_status": "Running",
+        "pod_restarts": 3,
+        "deployment_status": "Available",
+        "replicas_desired": 3,
+        "replicas_ready": 3,
+        "health": "Degraded"
+    },
+    "payment-api": {
+        "environment": "production",
+        "instance_status": "running",
+        "pod_status": "Running",
+        "pod_restarts": 1,
+        "deployment_status": "Available",
+        "replicas_desired": 3,
+        "replicas_ready": 3,
+        "health": "Healthy"
+    },
+    "inventory-api": {
+        "environment": "production",
+        "instance_status": "running",
+        "pod_status": "Running",
+        "pod_restarts": 2,
+        "deployment_status": "Available",
+        "replicas_desired": 3,
+        "replicas_ready": 3,
+        "health": "Degraded"
+    }
+}
