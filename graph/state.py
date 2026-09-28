@@ -14,6 +14,11 @@ class IncidentState(TypedDict, total=False):
     cloudwatch_alarm_state: str
     cloudwatch_metric: str
 
+    # Jira incident
+    jira_issue_key: str
+    jira_issue_url: str
+    jira_status: str
+
     # Investigation data
     metrics: str
     logs: str

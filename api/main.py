@@ -15,7 +15,7 @@ app = FastAPI(
         "AI-powered SRE incident investigation and "
         "human-approved remediation system."
     ),
-    version="1.1.0"
+    version="1.1.0",
 )
 
 
@@ -41,6 +41,17 @@ def format_result(state, status, thread_id):
         # Incident
         "service": state.get("service"),
         "incident": state.get("incident"),
+
+        # Jira
+        "jira_issue_key": state.get(
+            "jira_issue_key"
+        ),
+        "jira_issue_url": state.get(
+            "jira_issue_url"
+        ),
+        "jira_status": state.get(
+            "jira_status"
+        ),
 
         # RCA
         "root_cause": state.get("root_cause"),
@@ -77,7 +88,7 @@ def format_result(state, status, thread_id):
         ),
         "remediation_plan": state.get(
             "final_report"
-        )
+        ),
     }
 
 
@@ -87,7 +98,7 @@ def root():
     return {
         "service": "SRE Multi-Agent",
         "status": "running",
-        "version": "1.1.0"
+        "version": "1.1.0",
     }
 
 
@@ -95,38 +106,38 @@ def root():
 def health():
 
     return {
-        "status": "healthy"
+        "status": "healthy",
     }
 
 
 @app.post("/incident")
 def create_incident(
-    request: IncidentRequest
+    request: IncidentRequest,
 ):
 
     thread_id = str(uuid.uuid4())
 
     config = {
         "configurable": {
-            "thread_id": thread_id
+            "thread_id": thread_id,
         }
     }
 
     initial_state = {
         "incident": request.incident,
-        "service": request.service
+        "service": request.service,
     }
 
     # Persist incident context before
     # starting the workflow.
     incident_graph.update_state(
         config,
-        initial_state
+        initial_state,
     )
 
     result = incident_graph.invoke(
         None,
-        config=config
+        config=config,
     )
 
     if "__interrupt__" in result:
@@ -140,7 +151,7 @@ def create_incident(
             "thread_id": thread_id,
             "approval_request": (
                 interrupt_data.value
-            )
+            ),
         }
 
     final_state = incident_graph.get_state(
@@ -150,17 +161,17 @@ def create_incident(
     return format_result(
         final_state,
         "completed",
-        thread_id
+        thread_id,
     )
 
 
 @app.post("/cloudwatch/incidents")
 def create_cloudwatch_incidents(
-    request: CloudWatchIncidentRequest
+    request: CloudWatchIncidentRequest,
 ):
 
     results = start_cloudwatch_incidents(
-        region_name=request.region_name
+        region_name=request.region_name,
     )
 
     if not results:
@@ -169,7 +180,7 @@ def create_cloudwatch_incidents(
             "status": "no_incidents",
             "region": request.region_name,
             "incidents_detected": 0,
-            "incidents": []
+            "incidents": [],
         }
 
     incidents = []
@@ -181,6 +192,17 @@ def create_cloudwatch_incidents(
         incident_data = {
             "thread_id": result["thread_id"],
             "incident": result["incident"],
+
+            # Jira
+            "jira_issue_key": result[
+                "incident"
+            ].get("jira_issue_key"),
+            "jira_issue_url": result[
+                "incident"
+            ].get("jira_issue_url"),
+            "jira_status": result[
+                "incident"
+            ].get("jira_status"),
         }
 
         if "__interrupt__" in graph_result:
@@ -209,7 +231,7 @@ def create_cloudwatch_incidents(
         "status": "incidents_detected",
         "region": request.region_name,
         "incidents_detected": len(incidents),
-        "incidents": incidents
+        "incidents": incidents,
     }
 
 
@@ -218,7 +240,7 @@ def create_cloudwatch_incidents(
 )
 def approve_incident(
     thread_id: str,
-    request: ApprovalRequest
+    request: ApprovalRequest,
 ):
 
     decision = (
@@ -233,7 +255,7 @@ def approve_incident(
         "approve",
         "approved",
         "reject",
-        "rejected"
+        "rejected",
     ]:
 
         raise HTTPException(
@@ -242,12 +264,12 @@ def approve_incident(
                 "Decision must be one of: "
                 "yes, no, approve, approved, "
                 "reject, rejected"
-            )
+            ),
         )
 
     config = {
         "configurable": {
-            "thread_id": thread_id
+            "thread_id": thread_id,
         }
     }
 
@@ -263,12 +285,12 @@ def approve_incident(
             detail=(
                 "No active incident found for "
                 "the supplied thread_id."
-            )
+            ),
         )
 
     result = incident_graph.invoke(
         Command(resume=decision),
-        config=config
+        config=config,
     )
 
     if "__interrupt__" in result:
@@ -280,7 +302,7 @@ def approve_incident(
                 result[
                     "__interrupt__"
                 ][0].value
-            )
+            ),
         }
 
     # Read the complete persisted state
@@ -292,5 +314,5 @@ def approve_incident(
     return format_result(
         final_state,
         "completed",
-        thread_id
+        thread_id,
     )
