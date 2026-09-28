@@ -3,7 +3,7 @@ from utils.instrumentation import log_agent_execution
 
 
 @log_agent_execution("test_agent")
-def test_agent(state):
+def instrumented_test_agent(state):
 
     return {
         **state,
@@ -35,7 +35,7 @@ def test_agent_instrumentation():
         "service": "test-service"
     }
 
-    result = test_agent(state)
+    result = instrumented_test_agent(state)
 
     assert result["test"] == "passed"
 

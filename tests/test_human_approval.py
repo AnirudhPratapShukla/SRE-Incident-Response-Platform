@@ -6,54 +6,121 @@ from graph.state import IncidentState
 from agents.human_approval import human_approval
 
 
-workflow = StateGraph(IncidentState)
+def create_test_graph():
 
-workflow.add_node("human_approval", human_approval)
+    workflow = StateGraph(IncidentState)
 
-workflow.add_edge(START, "human_approval")
-workflow.add_edge("human_approval", END)
+    workflow.add_node(
+        "human_approval",
+        human_approval
+    )
 
-checkpointer = InMemorySaver()
+    workflow.add_edge(
+        START,
+        "human_approval"
+    )
 
-graph = workflow.compile(
-    checkpointer=checkpointer
-)
+    workflow.add_edge(
+        "human_approval",
+        END
+    )
+
+    checkpointer = InMemorySaver()
+
+    return workflow.compile(
+        checkpointer=checkpointer
+    )
 
 
-config = {
-    "configurable": {
-        "thread_id": "human-approval-test"
+def test_human_approval_yes():
+
+    graph = create_test_graph()
+
+    config = {
+        "configurable": {
+            "thread_id": "human-approval-test-yes"
+        }
     }
-}
+
+    initial_state = {
+        "service": "order-api",
+        "root_cause": (
+            "Database connection pool exhaustion"
+        ),
+        "recommendation": (
+            "Increase database connection pool size"
+        ),
+        "safety_status": "BLOCKED"
+    }
+
+    result = graph.invoke(
+        initial_state,
+        config=config
+    )
+
+    assert "__interrupt__" in result
+
+    result = graph.invoke(
+        Command(resume="yes"),
+        config=config
+    )
+
+    assert result.get("approval") == "yes"
+
+    print(
+        "PASS: Human approval YES workflow works"
+    )
 
 
-initial_state = {
-    "service": "order-api",
-    "root_cause": "Database connection pool exhaustion",
-    "recommendation": "Increase database connection pool size",
-    "safety_status": "BLOCKED"
-}
+def test_human_approval_no():
+
+    graph = create_test_graph()
+
+    config = {
+        "configurable": {
+            "thread_id": "human-approval-test-no"
+        }
+    }
+
+    initial_state = {
+        "service": "order-api",
+        "root_cause": (
+            "Database connection pool exhaustion"
+        ),
+        "recommendation": (
+            "Increase database connection pool size"
+        ),
+        "safety_status": "BLOCKED"
+    }
+
+    result = graph.invoke(
+        initial_state,
+        config=config
+    )
+
+    assert "__interrupt__" in result
+
+    result = graph.invoke(
+        Command(resume="no"),
+        config=config
+    )
+
+    assert result.get("approval") == "no"
+
+    print(
+        "PASS: Human approval NO workflow works"
+    )
 
 
-print("\nStarting Human Approval Test...\n")
+if __name__ == "__main__":
 
-result = graph.invoke(
-    initial_state,
-    config=config
-)
+    print(
+        "\nStarting Human Approval Tests...\n"
+    )
 
+    test_human_approval_yes()
+    test_human_approval_no()
 
-print("\nGraph paused:")
-print(result["__interrupt__"])
-
-decision = input("\nApprove remediation? (yes/no): ").strip().lower()
-
-
-result = graph.invoke(
-    Command(resume=decision),
-    config=config
-)
-
-
-print("\nFinal State:")
-print("Approval:", result.get("approval"))
+    print(
+        "\nAll human approval tests passed."
+    )

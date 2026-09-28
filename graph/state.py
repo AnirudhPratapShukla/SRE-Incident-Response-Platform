@@ -6,6 +6,13 @@ class IncidentState(TypedDict, total=False):
     # Incident information
     incident: str
     service: str
+    incident_source: str
+
+    # AWS context
+    aws_region: str
+    cloudwatch_alarm_name: str
+    cloudwatch_alarm_state: str
+    cloudwatch_metric: str
 
     # Investigation data
     metrics: str

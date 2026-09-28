@@ -4,6 +4,9 @@ from langgraph.types import Command
 import uuid
 
 from graph.workflow import incident_graph
+from services.cloudwatch_incident_runner import (
+    start_cloudwatch_incidents,
+)
 
 
 app = FastAPI(
@@ -12,7 +15,7 @@ app = FastAPI(
         "AI-powered SRE incident investigation and "
         "human-approved remediation system."
     ),
-    version="1.0.0"
+    version="1.1.0"
 )
 
 
@@ -23,6 +26,10 @@ class IncidentRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     decision: str
+
+
+class CloudWatchIncidentRequest(BaseModel):
+    region_name: str = "us-east-1"
 
 
 def format_result(state, status, thread_id):
@@ -80,7 +87,7 @@ def root():
     return {
         "service": "SRE Multi-Agent",
         "status": "running",
-        "version": "1.0.0"
+        "version": "1.1.0"
     }
 
 
@@ -145,6 +152,65 @@ def create_incident(
         "completed",
         thread_id
     )
+
+
+@app.post("/cloudwatch/incidents")
+def create_cloudwatch_incidents(
+    request: CloudWatchIncidentRequest
+):
+
+    results = start_cloudwatch_incidents(
+        region_name=request.region_name
+    )
+
+    if not results:
+
+        return {
+            "status": "no_incidents",
+            "region": request.region_name,
+            "incidents_detected": 0,
+            "incidents": []
+        }
+
+    incidents = []
+
+    for result in results:
+
+        graph_result = result["result"]
+
+        incident_data = {
+            "thread_id": result["thread_id"],
+            "incident": result["incident"],
+        }
+
+        if "__interrupt__" in graph_result:
+
+            interrupt_data = graph_result[
+                "__interrupt__"
+            ][0]
+
+            incident_data["status"] = (
+                "approval_required"
+            )
+
+            incident_data["approval_request"] = (
+                interrupt_data.value
+            )
+
+        else:
+
+            incident_data["status"] = (
+                "workflow_started"
+            )
+
+        incidents.append(incident_data)
+
+    return {
+        "status": "incidents_detected",
+        "region": request.region_name,
+        "incidents_detected": len(incidents),
+        "incidents": incidents
+    }
 
 
 @app.post(
