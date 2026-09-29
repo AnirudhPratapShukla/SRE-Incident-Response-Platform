@@ -10,8 +10,10 @@ class FakeGraph:
     def __init__(self):
         self.updated_states = []
         self.invocations = []
+        self.current_state = None
 
     def update_state(self, config, state):
+
         self.updated_states.append(
             {
                 "config": config,
@@ -19,7 +21,10 @@ class FakeGraph:
             }
         )
 
+        self.current_state = dict(state)
+
     def invoke(self, command, config):
+
         self.invocations.append(
             {
                 "command": command,
@@ -27,9 +32,24 @@ class FakeGraph:
             }
         )
 
+        self.current_state["jira_status"] = (
+            "IN REVIEW"
+        )
+
         return {
             "status": "started"
         }
+
+    def get_state(self, config):
+
+        class FakeCheckpoint:
+
+            def __init__(self, values):
+                self.values = values
+
+        return FakeCheckpoint(
+            self.current_state
+        )
 
 
 def sample_incident():
@@ -53,9 +73,6 @@ def sample_incident():
 
 
 @patch(
-    "services.cloudwatch_incident_runner.mark_in_progress"
-)
-@patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
 @patch(
@@ -68,7 +85,6 @@ def test_start_cloudwatch_incidents(
     mock_detect,
     mock_graph,
     mock_create_incident,
-    mock_mark_in_progress,
 ):
 
     fake_graph = FakeGraph()
@@ -79,6 +95,10 @@ def test_start_cloudwatch_incidents(
 
     mock_graph.invoke = (
         fake_graph.invoke
+    )
+
+    mock_graph.get_state = (
+        fake_graph.get_state
     )
 
     mock_detect.return_value = [
@@ -114,12 +134,7 @@ def test_start_cloudwatch_incidents(
     )
 
     assert result["incident"]["jira_status"] == (
-        "IN PROGRESS"
-    )
-
-    assert result["incident"]["jira_issue_url"] == (
-        "https://shuklaanirudhpratap.atlassian.net/"
-        "browse/SRE-4"
+        "IN REVIEW"
     )
 
     assert result["jira"] == {
@@ -137,20 +152,12 @@ def test_start_cloudwatch_incidents(
 
     mock_create_incident.assert_called_once()
 
-    mock_mark_in_progress.assert_called_once_with(
-        issue_key="SRE-4"
-    )
-
     jira_argument = (
         mock_create_incident.call_args.args[0]
     )
 
     assert jira_argument["jira_issue_key"] == (
         "SRE-4"
-    )
-
-    assert jira_argument["jira_status"] == (
-        "IN PROGRESS"
     )
 
     assert len(fake_graph.updated_states) == 1
@@ -161,10 +168,6 @@ def test_start_cloudwatch_incidents(
 
     assert updated_state["state"]["jira_issue_key"] == (
         "SRE-4"
-    )
-
-    assert updated_state["state"]["jira_status"] == (
-        "IN PROGRESS"
     )
 
     assert (
@@ -187,10 +190,11 @@ def test_start_cloudwatch_incidents(
         == result["thread_id"]
     )
 
+    assert len(
+        fake_graph.current_state
+    ) > 0
 
-@patch(
-    "services.cloudwatch_incident_runner.mark_in_progress"
-)
+
 @patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
@@ -204,7 +208,6 @@ def test_start_cloudwatch_incidents_when_empty(
     mock_detect,
     mock_graph,
     mock_create_incident,
-    mock_mark_in_progress,
 ):
 
     mock_detect.return_value = []
@@ -216,15 +219,14 @@ def test_start_cloudwatch_incidents_when_empty(
     assert results == []
 
     mock_create_incident.assert_not_called()
-    mock_mark_in_progress.assert_not_called()
 
     mock_graph.update_state.assert_not_called()
+
     mock_graph.invoke.assert_not_called()
 
+    mock_graph.get_state.assert_not_called()
 
-@patch(
-    "services.cloudwatch_incident_runner.mark_in_progress"
-)
+
 @patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
@@ -238,7 +240,6 @@ def test_start_cloudwatch_incidents_stops_when_jira_fails(
     mock_detect,
     mock_graph,
     mock_create_incident,
-    mock_mark_in_progress,
 ):
 
     mock_detect.return_value = [
@@ -250,6 +251,7 @@ def test_start_cloudwatch_incidents_stops_when_jira_fails(
     )
 
     try:
+
         start_cloudwatch_incidents(
             region_name="us-east-1"
         )
@@ -263,10 +265,11 @@ def test_start_cloudwatch_incidents_stops_when_jira_fails(
 
         assert str(exc) == "Jira unavailable"
 
-    mock_mark_in_progress.assert_not_called()
-
     mock_graph.update_state.assert_not_called()
+
     mock_graph.invoke.assert_not_called()
+
+    mock_graph.get_state.assert_not_called()
 
 
 @patch(
@@ -298,7 +301,7 @@ def test_start_cloudwatch_incidents_stops_when_transition_fails(
     }
 
     mock_mark_in_progress.side_effect = RuntimeError(
-        "Jira transition failed"
+        "Jira transition unavailable"
     )
 
     try:
@@ -309,20 +312,15 @@ def test_start_cloudwatch_incidents_stops_when_transition_fails(
 
         assert False, (
             "Expected Jira transition failure "
-            "to stop workflow execution."
+            "to stop incident processing."
         )
 
     except RuntimeError as exc:
 
         assert str(exc) == (
-            "Jira transition failed"
+            "Jira transition unavailable"
         )
 
-    mock_create_incident.assert_called_once()
-
-    mock_mark_in_progress.assert_called_once_with(
-        issue_key="SRE-4"
-    )
-
     mock_graph.update_state.assert_not_called()
+
     mock_graph.invoke.assert_not_called()

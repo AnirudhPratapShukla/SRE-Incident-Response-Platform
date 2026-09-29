@@ -90,6 +90,10 @@ def start_cloudwatch_incidents(
     Jira is moved to In Progress immediately before
     investigation begins.
 
+    The final persisted LangGraph state is returned so
+    Jira lifecycle updates such as IN REVIEW are reflected
+    in the returned incident data.
+
     This function does not perform remediation itself.
     """
 
@@ -127,10 +131,18 @@ def start_cloudwatch_incidents(
             config=config,
         )
 
+        # Read the latest persisted state.
+        # This is important because the graph may have
+        # updated jira_status to IN REVIEW before the
+        # human approval interrupt.
+        current_state = incident_graph.get_state(
+            config
+        ).values
+
         results.append(
             {
                 "thread_id": thread_id,
-                "incident": incident,
+                "incident": current_state,
                 "jira": jira_result,
                 "result": result,
             }
