@@ -53,6 +53,9 @@ def sample_incident():
 
 
 @patch(
+    "services.cloudwatch_incident_runner.mark_in_progress"
+)
+@patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
 @patch(
@@ -65,6 +68,7 @@ def test_start_cloudwatch_incidents(
     mock_detect,
     mock_graph,
     mock_create_incident,
+    mock_mark_in_progress,
 ):
 
     fake_graph = FakeGraph()
@@ -110,7 +114,7 @@ def test_start_cloudwatch_incidents(
     )
 
     assert result["incident"]["jira_status"] == (
-        "CREATED"
+        "IN PROGRESS"
     )
 
     assert result["incident"]["jira_issue_url"] == (
@@ -133,12 +137,20 @@ def test_start_cloudwatch_incidents(
 
     mock_create_incident.assert_called_once()
 
+    mock_mark_in_progress.assert_called_once_with(
+        issue_key="SRE-4"
+    )
+
     jira_argument = (
         mock_create_incident.call_args.args[0]
     )
 
     assert jira_argument["jira_issue_key"] == (
         "SRE-4"
+    )
+
+    assert jira_argument["jira_status"] == (
+        "IN PROGRESS"
     )
 
     assert len(fake_graph.updated_states) == 1
@@ -149,6 +161,10 @@ def test_start_cloudwatch_incidents(
 
     assert updated_state["state"]["jira_issue_key"] == (
         "SRE-4"
+    )
+
+    assert updated_state["state"]["jira_status"] == (
+        "IN PROGRESS"
     )
 
     assert (
@@ -173,6 +189,9 @@ def test_start_cloudwatch_incidents(
 
 
 @patch(
+    "services.cloudwatch_incident_runner.mark_in_progress"
+)
+@patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
 @patch(
@@ -185,6 +204,7 @@ def test_start_cloudwatch_incidents_when_empty(
     mock_detect,
     mock_graph,
     mock_create_incident,
+    mock_mark_in_progress,
 ):
 
     mock_detect.return_value = []
@@ -196,12 +216,15 @@ def test_start_cloudwatch_incidents_when_empty(
     assert results == []
 
     mock_create_incident.assert_not_called()
+    mock_mark_in_progress.assert_not_called()
 
     mock_graph.update_state.assert_not_called()
-
     mock_graph.invoke.assert_not_called()
 
 
+@patch(
+    "services.cloudwatch_incident_runner.mark_in_progress"
+)
 @patch(
     "services.cloudwatch_incident_runner.create_incident"
 )
@@ -215,6 +238,7 @@ def test_start_cloudwatch_incidents_stops_when_jira_fails(
     mock_detect,
     mock_graph,
     mock_create_incident,
+    mock_mark_in_progress,
 ):
 
     mock_detect.return_value = [
@@ -229,12 +253,76 @@ def test_start_cloudwatch_incidents_stops_when_jira_fails(
         start_cloudwatch_incidents(
             region_name="us-east-1"
         )
+
         assert False, (
             "Expected Jira failure to stop "
             "CloudWatch incident processing."
         )
+
     except RuntimeError as exc:
+
         assert str(exc) == "Jira unavailable"
+
+    mock_mark_in_progress.assert_not_called()
+
+    mock_graph.update_state.assert_not_called()
+    mock_graph.invoke.assert_not_called()
+
+
+@patch(
+    "services.cloudwatch_incident_runner.mark_in_progress"
+)
+@patch(
+    "services.cloudwatch_incident_runner.create_incident"
+)
+@patch(
+    "services.cloudwatch_incident_runner.incident_graph"
+)
+@patch(
+    "services.cloudwatch_incident_runner.detect_cloudwatch_incidents"
+)
+def test_start_cloudwatch_incidents_stops_when_transition_fails(
+    mock_detect,
+    mock_graph,
+    mock_create_incident,
+    mock_mark_in_progress,
+):
+
+    mock_detect.return_value = [
+        sample_incident()
+    ]
+
+    mock_create_incident.return_value = {
+        "id": "10013",
+        "key": "SRE-4",
+    }
+
+    mock_mark_in_progress.side_effect = RuntimeError(
+        "Jira transition failed"
+    )
+
+    try:
+
+        start_cloudwatch_incidents(
+            region_name="us-east-1"
+        )
+
+        assert False, (
+            "Expected Jira transition failure "
+            "to stop workflow execution."
+        )
+
+    except RuntimeError as exc:
+
+        assert str(exc) == (
+            "Jira transition failed"
+        )
+
+    mock_create_incident.assert_called_once()
+
+    mock_mark_in_progress.assert_called_once_with(
+        issue_key="SRE-4"
+    )
 
     mock_graph.update_state.assert_not_called()
     mock_graph.invoke.assert_not_called()

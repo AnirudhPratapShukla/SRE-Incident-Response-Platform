@@ -14,6 +14,11 @@ from agents.safety_agent import safety_agent
 from agents.remediation_agent import remediation_agent
 from agents.human_approval import human_approval
 
+from jira.lifecycle import (
+    mark_in_review,
+    mark_done,
+)
+
 
 # ============================================================
 # CHECKPOINT DATABASE
@@ -28,13 +33,98 @@ checkpointer = SqliteSaver(connection)
 
 
 # ============================================================
+# JIRA REVIEW
+# ============================================================
+
+def jira_review(
+    state: IncidentState,
+) -> IncidentState:
+    """
+    Move a non-blocked Jira incident to In Review
+    before human approval.
+    """
+
+    safety_status = state.get(
+        "safety_status",
+        "UNKNOWN"
+    )
+
+    if safety_status == "BLOCKED":
+        return state
+
+    issue_key = state.get(
+        "jira_issue_key"
+    )
+
+    if not issue_key:
+        raise RuntimeError(
+            "Cannot move Jira incident to In Review "
+            "because jira_issue_key is missing."
+        )
+
+    mark_in_review(
+        issue_key=issue_key
+    )
+
+    state["jira_status"] = "IN REVIEW"
+
+    return state
+
+
+# ============================================================
+# JIRA DONE
+# ============================================================
+
+def jira_done(
+    state: IncidentState,
+) -> IncidentState:
+    """
+    Move an approved Jira incident to Done after
+    the remediation plan has been prepared.
+    """
+
+    approval = state.get(
+        "approval",
+        ""
+    ).strip().lower()
+
+    if approval not in [
+        "yes",
+        "approve",
+        "approved"
+    ]:
+        return state
+
+    issue_key = state.get(
+        "jira_issue_key"
+    )
+
+    if not issue_key:
+        raise RuntimeError(
+            "Cannot move Jira incident to Done "
+            "because jira_issue_key is missing."
+        )
+
+    mark_done(
+        issue_key=issue_key
+    )
+
+    state["jira_status"] = "DONE"
+
+    return state
+
+
+# ============================================================
 # GRAPH
 # ============================================================
 
 workflow = StateGraph(IncidentState)
 
 
-# Add agents
+# ============================================================
+# ADD AGENTS
+# ============================================================
+
 workflow.add_node(
     "monitoring",
     monitoring_agent
@@ -66,6 +156,11 @@ workflow.add_node(
 )
 
 workflow.add_node(
+    "jira_review",
+    jira_review
+)
+
+workflow.add_node(
     "human_approval",
     human_approval
 )
@@ -73,6 +168,11 @@ workflow.add_node(
 workflow.add_node(
     "remediation",
     remediation_agent
+)
+
+workflow.add_node(
+    "jira_done",
+    jira_done
 )
 
 
@@ -110,6 +210,11 @@ workflow.add_edge(
     "safety"
 )
 
+workflow.add_edge(
+    "safety",
+    "jira_review"
+)
+
 
 # ============================================================
 # SAFETY ROUTING
@@ -129,7 +234,7 @@ def safety_router(state: IncidentState):
 
 
 workflow.add_conditional_edges(
-    "safety",
+    "jira_review",
     safety_router,
     {
         "human_approval": "human_approval",
@@ -175,6 +280,16 @@ workflow.add_conditional_edges(
 
 workflow.add_edge(
     "remediation",
+    "jira_done"
+)
+
+
+# ============================================================
+# JIRA DONE → END
+# ============================================================
+
+workflow.add_edge(
+    "jira_done",
     END
 )
 

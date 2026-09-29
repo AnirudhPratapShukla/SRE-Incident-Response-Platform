@@ -9,6 +9,7 @@ from detection.cloudwatch_detector import (
 )
 from graph.workflow import incident_graph
 from jira.incidents import create_incident
+from jira.lifecycle import mark_in_progress
 
 
 def _create_jira_incident(
@@ -46,17 +47,48 @@ def _create_jira_incident(
     return jira_result
 
 
+def _mark_jira_in_progress(
+    incident: dict[str, Any],
+) -> None:
+    """
+    Move the Jira incident to In Progress.
+
+    The Jira issue key must already exist in the
+    incident state.
+    """
+
+    issue_key = incident.get(
+        "jira_issue_key"
+    )
+
+    if not issue_key:
+        raise RuntimeError(
+            "Cannot move Jira incident to In Progress "
+            "because jira_issue_key is missing."
+        )
+
+    mark_in_progress(
+        issue_key=issue_key
+    )
+
+    incident["jira_status"] = "IN PROGRESS"
+
+
 def start_cloudwatch_incidents(
     region_name: str,
 ) -> list[dict[str, Any]]:
     """
     Detect active CloudWatch alarms, create a Jira
-    Incident for each one, and start the existing
-    SRE LangGraph workflow.
+    Incident for each one, move the Jira incident to
+    In Progress, and start the existing SRE LangGraph
+    workflow.
 
     Jira creation happens before the LangGraph workflow
     starts so every processed CloudWatch incident is
     recorded in Jira first.
+
+    Jira is moved to In Progress immediately before
+    investigation begins.
 
     This function does not perform remediation itself.
     """
@@ -70,6 +102,10 @@ def start_cloudwatch_incidents(
     for incident in incidents:
 
         jira_result = _create_jira_incident(
+            incident
+        )
+
+        _mark_jira_in_progress(
             incident
         )
 
@@ -123,6 +159,13 @@ if __name__ == "__main__":
         print(
             result["incident"].get(
                 "jira_issue_key"
+            )
+        )
+
+        print("\nJira Status:")
+        print(
+            result["incident"].get(
+                "jira_status"
             )
         )
 
