@@ -14,6 +14,10 @@ class IncidentState(TypedDict, total=False):
     cloudwatch_alarm_state: str
     cloudwatch_metric: str
 
+    # MCP AWS context
+    mcp_ec2_instances: list[dict]
+    mcp_cloudwatch_alarms: list[dict]
+
     # Jira incident
     jira_issue_key: str
     jira_issue_url: str

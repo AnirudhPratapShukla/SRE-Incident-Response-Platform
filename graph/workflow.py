@@ -8,6 +8,7 @@ from graph.state import IncidentState
 from agents.monitoring_agent import monitoring_agent
 from agents.log_agent import log_agent
 from agents.infrastructure_agent import infrastructure_agent
+from agents.mcp_aws_agent import mcp_aws_agent
 from agents.rag_agent import rag_agent
 from agents.rca_agent import rca_agent
 from agents.safety_agent import safety_agent
@@ -141,6 +142,11 @@ workflow.add_node(
 )
 
 workflow.add_node(
+    "mcp_aws_context",
+    mcp_aws_agent
+)
+
+workflow.add_node(
     "rag",
     rag_agent
 )
@@ -197,6 +203,11 @@ workflow.add_edge(
 
 workflow.add_edge(
     "infrastructure",
+    "mcp_aws_context"
+)
+
+workflow.add_edge(
+    "mcp_aws_context",
     "rag"
 )
 
