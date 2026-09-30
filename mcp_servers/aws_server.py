@@ -1,5 +1,6 @@
 import boto3
 
+from botocore.exceptions import ClientError
 from pydantic import BaseModel, Field
 
 from mcp.server import MCPServer
@@ -81,10 +82,32 @@ def get_ec2_instance_status(
 
     ec2 = get_ec2_client()
 
-    response = ec2.describe_instance_status(
-        InstanceIds=[instance_id],
-        IncludeAllInstances=True,
-    )
+    try:
+        response = ec2.describe_instance_status(
+            InstanceIds=[instance_id],
+            IncludeAllInstances=True,
+        )
+
+    except ClientError as exc:
+
+        error_code = exc.response.get(
+            "Error", {}
+        ).get("Code")
+
+        if error_code in [
+            "InvalidInstanceID.NotFound",
+            "InvalidInstanceID.Malformed",
+        ]:
+            return EC2InstanceStatus(
+                instance_id=instance_id,
+                found=False,
+                message=(
+                    "EC2 instance was not found or "
+                    "the instance ID is invalid."
+                ),
+            )
+
+        raise
 
     statuses = response.get("InstanceStatuses", [])
 
