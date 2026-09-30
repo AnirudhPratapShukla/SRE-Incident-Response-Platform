@@ -1,3 +1,5 @@
+import json
+
 from utils.instrumentation import log_agent_execution
 
 from graph.state import IncidentState
@@ -62,11 +64,9 @@ def parse_rca_response(response_text: str) -> dict:
         if current_section:
             sections[current_section] += line + "\n"
 
-    # Clean extracted sections
     for key in sections:
         sections[key] = sections[key].strip()
 
-    # Fallback if the model does not follow the requested format
     if not sections["root_cause"]:
         sections["root_cause"] = response_text.strip()
 
@@ -85,10 +85,14 @@ def parse_rca_response(response_text: str) -> dict:
     return sections
 
 
-@log_agent_execution("rca_agent")
-def rca_agent(state: IncidentState) -> IncidentState:
-
-    print("\n[RCA Agent] Analyzing incident evidence...")
+def build_rca_prompt(
+    state: IncidentState,
+) -> str:
+    """
+    Build the RCA prompt using investigation data,
+    historical incidents, and live AWS context collected
+    through MCP.
+    """
 
     service = state.get(
         "service",
@@ -115,6 +119,26 @@ def rca_agent(state: IncidentState) -> IncidentState:
         "No historical incidents available."
     )
 
+    mcp_ec2_instances = state.get(
+        "mcp_ec2_instances",
+        []
+    )
+
+    mcp_cloudwatch_alarms = state.get(
+        "mcp_cloudwatch_alarms",
+        []
+    )
+
+    mcp_ec2_context = json.dumps(
+        mcp_ec2_instances,
+        indent=2
+    )
+
+    mcp_cloudwatch_context = json.dumps(
+        mcp_cloudwatch_alarms,
+        indent=2
+    )
+
     prompt = f"""
 You are an experienced Site Reliability Engineer
 performing Root Cause Analysis.
@@ -133,19 +157,42 @@ CURRENT LOGS:
 INFRASTRUCTURE STATUS:
 {infrastructure}
 
+LIVE AWS CONTEXT FROM MCP:
+
+EC2 INSTANCES:
+{mcp_ec2_context}
+
+CLOUDWATCH ALARMS CURRENTLY IN ALARM STATE:
+{mcp_cloudwatch_context}
+
 HISTORICAL INCIDENTS:
 {historical_incidents}
 
+IMPORTANT:
+The MCP AWS context is live read-only infrastructure
+information collected from AWS.
+
+Use the MCP information as supporting evidence when
+it is relevant to the incident.
+
+Do not assume that an empty MCP result means an error.
+An empty list means that no matching resources were
+returned at the time of collection.
+
+Do not invent infrastructure problems that are not
+supported by the provided evidence.
+
 Perform a structured RCA.
 
-IMPORTANT:
 Return the analysis using EXACTLY these section headings:
 
 MOST LIKELY ROOT CAUSE:
 Provide the most likely technical root cause.
 
 SUPPORTING EVIDENCE:
-Explain the evidence from metrics and logs.
+Explain the evidence from metrics, logs,
+infrastructure status, MCP AWS context,
+and historical incidents.
 
 IMPACT:
 Explain the likely impact on the service.
@@ -160,10 +207,7 @@ PREVENTION RECOMMENDATIONS:
 Provide recommendations to reduce the chance of recurrence.
 
 Correlate the metrics, logs, infrastructure status,
-and historical incidents.
-
-Do not invent infrastructure problems that are not
-supported by the provided evidence.
+live MCP AWS context, and historical incidents.
 
 Clearly explain why the identified root cause is
 the most likely explanation.
@@ -171,26 +215,56 @@ the most likely explanation.
 Keep the analysis concise and technically specific.
 """
 
-    response = llm.invoke(prompt)
+    return prompt
+
+
+@log_agent_execution("rca_agent")
+def rca_agent(
+    state: IncidentState
+) -> IncidentState:
+
+    print(
+        "\n[RCA Agent] "
+        "Analyzing incident evidence..."
+    )
+
+    prompt = build_rca_prompt(
+        state
+    )
+
+    response = llm.invoke(
+        prompt
+    )
 
     rca_text = response.content
 
-    parsed_rca = parse_rca_response(rca_text)
+    parsed_rca = parse_rca_response(
+        rca_text
+    )
 
-    state["root_cause"] = parsed_rca["root_cause"]
-    state["supporting_evidence"] = parsed_rca[
-        "supporting_evidence"
-    ]
-    state["impact"] = parsed_rca["impact"]
-    state["recommendation"] = parsed_rca[
-        "recommendation"
-    ]
-    state["rollback_plan"] = parsed_rca[
-        "rollback_plan"
-    ]
+    state["root_cause"] = (
+        parsed_rca["root_cause"]
+    )
+
+    state["supporting_evidence"] = (
+        parsed_rca["supporting_evidence"]
+    )
+
+    state["impact"] = (
+        parsed_rca["impact"]
+    )
+
+    state["recommendation"] = (
+        parsed_rca["recommendation"]
+    )
+
+    state["rollback_plan"] = (
+        parsed_rca["rollback_plan"]
+    )
 
     print(
-        "[RCA Agent] Root Cause Analysis completed."
+        "[RCA Agent] "
+        "Root Cause Analysis completed."
     )
 
     return state
