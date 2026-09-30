@@ -80,24 +80,44 @@ def jira_done(
     state: IncidentState,
 ) -> IncidentState:
     """
-    Move an approved Jira incident to Done after
-    the remediation plan has been prepared.
+    Move an approved Jira incident to Done only after
+    controlled remediation has been successfully verified.
     """
 
     approval = state.get(
         "approval",
-        ""
+        "",
     ).strip().lower()
 
     if approval not in [
         "yes",
         "approve",
-        "approved"
+        "approved",
     ]:
         return state
 
+    execution_status = state.get(
+        "execution_status",
+        "",
+    ).strip().upper()
+
+    verification_status = state.get(
+        "verification_status",
+        "",
+    ).strip().upper()
+
+    if (
+        not execution_status.startswith("EXECUTED")
+        or verification_status != "VERIFIED"
+    ):
+        print(
+            "[Jira] Remediation has not been successfully "
+            "verified. Incident will remain open."
+        )
+        return state
+
     issue_key = state.get(
-        "jira_issue_key"
+        "jira_issue_key",
     )
 
     if not issue_key:
@@ -113,8 +133,6 @@ def jira_done(
     state["jira_status"] = "DONE"
 
     return state
-
-
 # ============================================================
 # GRAPH
 # ============================================================

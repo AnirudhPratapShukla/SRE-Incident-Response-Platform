@@ -140,7 +140,7 @@ def test_jira_review_requires_issue_key():
 # JIRA DONE
 # ============================================================
 
-def test_jira_done_moves_approved_incident_to_done(
+def test_jira_done_moves_executed_incident_to_done(
     monkeypatch
 ):
 
@@ -159,12 +159,76 @@ def test_jira_done_moves_approved_incident_to_done(
     state = {
         "jira_issue_key": "SRE-TEST-3",
         "approval": "yes",
+        "execution_status": (
+            "EXECUTED - EC2 REBOOT VERIFIED THROUGH MCP"
+        ),
+        "verification_status": "VERIFIED",
     }
 
     result = workflow_module.jira_done(state)
 
     assert transitions == ["SRE-TEST-3"]
     assert result["jira_status"] == "DONE"
+
+
+def test_jira_done_does_not_transition_failed_remediation(
+    monkeypatch
+):
+
+    transitions = []
+
+    def fake_mark_done(issue_key):
+
+        transitions.append(issue_key)
+
+    monkeypatch.setattr(
+        workflow_module,
+        "mark_done",
+        fake_mark_done,
+    )
+
+    state = {
+        "jira_issue_key": "SRE-TEST-5",
+        "approval": "yes",
+        "execution_status": "EXECUTION FAILED",
+        "verification_status": "FAILED",
+    }
+
+    result = workflow_module.jira_done(state)
+
+    assert transitions == []
+    assert "jira_status" not in result
+
+
+def test_jira_done_does_not_transition_unexecuted_remediation(
+    monkeypatch
+):
+
+    transitions = []
+
+    def fake_mark_done(issue_key):
+
+        transitions.append(issue_key)
+
+    monkeypatch.setattr(
+        workflow_module,
+        "mark_done",
+        fake_mark_done,
+    )
+
+    state = {
+        "jira_issue_key": "SRE-TEST-6",
+        "approval": "yes",
+        "execution_status": (
+            "APPROVED - READY FOR CONTROLLED EXECUTION"
+        ),
+        "verification_status": "NOT RUN",
+    }
+
+    result = workflow_module.jira_done(state)
+
+    assert transitions == []
+    assert "jira_status" not in result
 
 
 def test_jira_done_does_not_transition_rejected_incident(
@@ -186,6 +250,8 @@ def test_jira_done_does_not_transition_rejected_incident(
     state = {
         "jira_issue_key": "SRE-TEST-4",
         "approval": "no",
+        "execution_status": "NOT EXECUTED",
+        "verification_status": "NOT RUN",
     }
 
     result = workflow_module.jira_done(state)
@@ -198,6 +264,10 @@ def test_jira_done_requires_issue_key():
 
     state = {
         "approval": "yes",
+        "execution_status": (
+            "EXECUTED - EC2 REBOOT VERIFIED THROUGH MCP"
+        ),
+        "verification_status": "VERIFIED",
     }
 
     with pytest.raises(

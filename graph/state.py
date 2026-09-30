@@ -44,6 +44,16 @@ class IncidentState(TypedDict, total=False):
     # Human approval
     approval: str
 
+   
     # Remediation
+    remediation_action: str
+    remediation_instance_id: str
+    remediation_dry_run: bool
+    remediation_result: str
+
+    # Verification
+    verification_status: str
+    verification_message: str
+
     execution_status: str
     final_report: str

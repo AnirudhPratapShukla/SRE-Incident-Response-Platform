@@ -8,7 +8,9 @@ async def list_ec2_instances():
     Retrieve EC2 instances through the AWS MCP server.
     """
 
-    async with Client(aws_server.mcp) as client:
+    async with Client(
+        aws_server.mcp
+    ) as client:
 
         result = await client.call_tool(
             "list_ec2_instances",
@@ -16,6 +18,7 @@ async def list_ec2_instances():
         )
 
         if result.is_error:
+
             raise RuntimeError(
                 "MCP EC2 list tool failed."
             )
@@ -30,7 +33,9 @@ async def get_ec2_instance_status(
     Retrieve EC2 instance status through the AWS MCP server.
     """
 
-    async with Client(aws_server.mcp) as client:
+    async with Client(
+        aws_server.mcp
+    ) as client:
 
         result = await client.call_tool(
             "get_ec2_instance_status",
@@ -40,6 +45,7 @@ async def get_ec2_instance_status(
         )
 
         if result.is_error:
+
             raise RuntimeError(
                 "MCP EC2 status tool failed."
             )
@@ -52,7 +58,9 @@ async def get_cloudwatch_alarms():
     Retrieve CloudWatch ALARM state through the AWS MCP server.
     """
 
-    async with Client(aws_server.mcp) as client:
+    async with Client(
+        aws_server.mcp
+    ) as client:
 
         result = await client.call_tool(
             "get_cloudwatch_alarms",
@@ -60,8 +68,47 @@ async def get_cloudwatch_alarms():
         )
 
         if result.is_error:
+
             raise RuntimeError(
                 "MCP CloudWatch alarm tool failed."
+            )
+
+        return result.structured_content
+
+
+async def reboot_ec2_instance(
+    instance_id: str,
+    approved: bool,
+    dry_run: bool = True,
+):
+    """
+    Request a controlled EC2 reboot through MCP.
+
+    Actual AWS modification requires:
+
+        approved=True
+        dry_run=False
+
+    The default is dry-run.
+    """
+
+    async with Client(
+        aws_server.mcp
+    ) as client:
+
+        result = await client.call_tool(
+            "reboot_ec2_instance",
+            {
+                "instance_id": instance_id,
+                "approved": approved,
+                "dry_run": dry_run,
+            },
+        )
+
+        if result.is_error:
+
+            raise RuntimeError(
+                "MCP EC2 reboot tool failed."
             )
 
         return result.structured_content
