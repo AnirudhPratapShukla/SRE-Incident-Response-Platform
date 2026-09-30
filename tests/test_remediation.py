@@ -268,6 +268,177 @@ def test_reboot_execution_without_recovery_verification(
     ).lower()
 
 
+# ============================================================
+# DIRECT MCP EXECUTION + VERIFICATION
+# ============================================================
+
+def test_execute_reboot_with_successful_verification(
+    monkeypatch
+):
+
+    async def fake_reboot_ec2_instance(
+        instance_id,
+        approved,
+        dry_run,
+    ):
+
+        assert instance_id == "i-123abc456def"
+        assert approved is True
+
+        if dry_run:
+
+            return {
+                "instance_id": instance_id,
+                "approved": True,
+                "dry_run": True,
+                "executed": False,
+                "success": True,
+                "message": (
+                    "Dry-run validation successful."
+                ),
+            }
+
+        return {
+            "instance_id": instance_id,
+            "approved": True,
+            "dry_run": False,
+            "executed": True,
+            "success": True,
+            "message": (
+                "EC2 reboot requested successfully."
+            ),
+        }
+
+    async def fake_get_ec2_instance_status(
+        instance_id,
+    ):
+
+        return {
+            "instance_id": instance_id,
+            "found": True,
+            "instance_state": "running",
+            "system_status": "ok",
+            "instance_status": "ok",
+        }
+
+    async def fake_sleep(seconds):
+
+        return None
+
+    monkeypatch.setattr(
+        remediation_module,
+        "reboot_ec2_instance",
+        fake_reboot_ec2_instance,
+    )
+
+    monkeypatch.setattr(
+        remediation_module,
+        "get_ec2_instance_status",
+        fake_get_ec2_instance_status,
+    )
+
+    monkeypatch.setattr(
+        remediation_module.asyncio,
+        "sleep",
+        fake_sleep,
+    )
+
+    result = remediation_module._execute_reboot(
+        "i-123abc456def"
+    )
+
+    assert result["success"] is True
+    assert result["executed"] is True
+    assert result["verified"] is True
+    assert "verified" in (
+        result["message"]
+    ).lower()
+
+
+def test_execute_reboot_with_failed_verification(
+    monkeypatch
+):
+
+    async def fake_reboot_ec2_instance(
+        instance_id,
+        approved,
+        dry_run,
+    ):
+
+        if dry_run:
+
+            return {
+                "instance_id": instance_id,
+                "approved": True,
+                "dry_run": True,
+                "executed": False,
+                "success": True,
+                "message": (
+                    "Dry-run validation successful."
+                ),
+            }
+
+        return {
+            "instance_id": instance_id,
+            "approved": True,
+            "dry_run": False,
+            "executed": True,
+            "success": True,
+            "message": (
+                "EC2 reboot requested successfully."
+            ),
+        }
+
+    async def fake_get_ec2_instance_status(
+        instance_id,
+    ):
+
+        return {
+            "instance_id": instance_id,
+            "found": True,
+            "instance_state": "stopped",
+            "system_status": "initializing",
+            "instance_status": "initializing",
+        }
+
+    async def fake_sleep(seconds):
+
+        return None
+
+    monkeypatch.setattr(
+        remediation_module,
+        "reboot_ec2_instance",
+        fake_reboot_ec2_instance,
+    )
+
+    monkeypatch.setattr(
+        remediation_module,
+        "get_ec2_instance_status",
+        fake_get_ec2_instance_status,
+    )
+
+    monkeypatch.setattr(
+        remediation_module.asyncio,
+        "sleep",
+        fake_sleep,
+    )
+
+    result = remediation_module._execute_reboot(
+        "i-123abc456def"
+    )
+
+    assert result["success"] is False
+    assert result["executed"] is True
+    assert result["verified"] is False
+    assert "verification failed" in (
+        result["message"]
+    ).lower()
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
 if __name__ == "__main__":
 
     print("\nStarting Remediation Tests...\n")
