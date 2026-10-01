@@ -35,3 +35,6 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local UI backup
+ui/app.py.backup

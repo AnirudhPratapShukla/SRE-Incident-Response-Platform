@@ -44,11 +44,11 @@ class IncidentState(TypedDict, total=False):
     # Human approval
     approval: str
 
-   
     # Remediation
     remediation_action: str
     remediation_instance_id: str
     remediation_dry_run: bool
+    remediation_simulation_mode: bool
     remediation_result: str
 
     # Verification

@@ -3,6 +3,7 @@ import asyncio
 from utils.instrumentation import log_agent_execution
 
 from graph.state import IncidentState
+
 from mcp_client.aws_client import (
     reboot_ec2_instance,
     get_ec2_instance_status,
@@ -14,7 +15,9 @@ SUPPORTED_ACTIONS = {
 }
 
 
-def _is_approved(approval: str) -> bool:
+def _is_approved(
+    approval: str,
+) -> bool:
 
     return approval.strip().lower() in {
         "yes",
@@ -23,7 +26,9 @@ def _is_approved(approval: str) -> bool:
     }
 
 
-def _is_rejected(approval: str) -> bool:
+def _is_rejected(
+    approval: str,
+) -> bool:
 
     return approval.strip().lower() in {
         "no",
@@ -40,7 +45,10 @@ async def _verify_ec2_recovery_async(
 
     last_status = None
 
-    for attempt in range(1, attempts + 1):
+    for attempt in range(
+        1,
+        attempts + 1,
+    ):
 
         status = await get_ec2_instance_status(
             instance_id
@@ -50,23 +58,29 @@ async def _verify_ec2_recovery_async(
 
         if (
             status.get("found") is True
-            and status.get("instance_state") == "running"
-            and status.get("system_status") == "ok"
-            and status.get("instance_status") == "ok"
+            and status.get("instance_state")
+            == "running"
+            and status.get("system_status")
+            == "ok"
+            and status.get("instance_status")
+            == "ok"
         ):
 
             return {
                 "success": True,
                 "message": (
                     "EC2 instance recovered successfully. "
-                    f"Instance is running with healthy status "
-                    f"after verification attempt {attempt}."
+                    f"Instance is running with healthy "
+                    f"status after verification attempt "
+                    f"{attempt}."
                 ),
             }
 
         if attempt < attempts:
 
-            await asyncio.sleep(delay_seconds)
+            await asyncio.sleep(
+                delay_seconds
+            )
 
     return {
         "success": False,
@@ -87,13 +101,18 @@ def _execute_reboot(
         # STEP 1: MCP DRY RUN
         # ----------------------------------------------------
 
-        dry_run_result = await reboot_ec2_instance(
-            instance_id=instance_id,
-            approved=True,
-            dry_run=True,
+        dry_run_result = (
+            await reboot_ec2_instance(
+                instance_id=instance_id,
+                approved=True,
+                dry_run=True,
+            )
         )
 
-        if not dry_run_result.get("success", False):
+        if not dry_run_result.get(
+            "success",
+            False,
+        ):
 
             return {
                 "success": False,
@@ -109,13 +128,18 @@ def _execute_reboot(
         # STEP 2: ACTUAL CONTROLLED EXECUTION
         # ----------------------------------------------------
 
-        execution_result = await reboot_ec2_instance(
-            instance_id=instance_id,
-            approved=True,
-            dry_run=False,
+        execution_result = (
+            await reboot_ec2_instance(
+                instance_id=instance_id,
+                approved=True,
+                dry_run=False,
+            )
         )
 
-        if not execution_result.get("success", False):
+        if not execution_result.get(
+            "success",
+            False,
+        ):
 
             return {
                 "success": False,
@@ -137,7 +161,10 @@ def _execute_reboot(
             )
         )
 
-        if not verification_result.get("success", False):
+        if not verification_result.get(
+            "success",
+            False,
+        ):
 
             return {
                 "success": False,
@@ -159,13 +186,48 @@ def _execute_reboot(
             ),
         }
 
-    return asyncio.run(run())
+    return asyncio.run(
+        run()
+    )
 
 
-@log_agent_execution("remediation_agent")
-def remediation_agent(state: IncidentState) -> IncidentState:
+def _simulate_reboot(
+    instance_id: str,
+) -> dict:
+    """
+    Safe UI/demo execution path.
 
-    print("\n[Remediation Agent] Building remediation plan...")
+    This function does NOT call AWS, MCP, EC2,
+    CloudWatch, or any external remediation API.
+
+    It represents a controlled remediation execution
+    and successful recovery verification for demonstration
+    and end-to-end UI testing.
+    """
+
+    return {
+        "success": True,
+        "executed": True,
+        "verified": True,
+        "message": (
+            "SAFE DEMO SIMULATION: EC2 reboot execution "
+            "and recovery verification completed successfully. "
+            "No AWS infrastructure was modified."
+        ),
+    }
+
+
+@log_agent_execution(
+    "remediation_agent"
+)
+def remediation_agent(
+    state: IncidentState,
+) -> IncidentState:
+
+    print(
+        "\n[Remediation Agent] "
+        "Building remediation plan..."
+    )
 
     service = state.get(
         "service",
@@ -189,14 +251,18 @@ def remediation_agent(state: IncidentState) -> IncidentState:
 
     recommendation = state.get(
         "recommendation",
-        "Review the identified root cause and apply "
-        "a controlled remediation.",
+        (
+            "Review the identified root cause "
+            "and apply a controlled remediation."
+        ),
     )
 
     rollback_plan = state.get(
         "rollback_plan",
-        "Restore the previous configuration if the "
-        "remediation causes unexpected behavior.",
+        (
+            "Restore the previous configuration "
+            "if the remediation causes unexpected behavior."
+        ),
     )
 
     safety_status = state.get(
@@ -229,6 +295,11 @@ def remediation_agent(state: IncidentState) -> IncidentState:
         "",
     ).strip()
 
+    remediation_simulation_mode = state.get(
+        "remediation_simulation_mode",
+        False,
+    )
+
     remediation_result = state.get(
         "remediation_result",
         "",
@@ -248,11 +319,15 @@ def remediation_agent(state: IncidentState) -> IncidentState:
     # Approval
     # --------------------------------------------------------
 
-    if _is_approved(approval):
+    if _is_approved(
+        approval
+    ):
 
         approval_status = "APPROVED"
 
-    elif _is_rejected(approval):
+    elif _is_rejected(
+        approval
+    ):
 
         approval_status = "REJECTED"
 
@@ -287,7 +362,10 @@ def remediation_agent(state: IncidentState) -> IncidentState:
     # Unsupported action
     # --------------------------------------------------------
 
-    elif remediation_action not in SUPPORTED_ACTIONS:
+    elif (
+        remediation_action
+        not in SUPPORTED_ACTIONS
+    ):
 
         execution_status = "NOT EXECUTED"
 
@@ -313,80 +391,176 @@ def remediation_agent(state: IncidentState) -> IncidentState:
         )
 
     # --------------------------------------------------------
-    # Controlled execution + verification
+    # Controlled execution
     # --------------------------------------------------------
 
     elif remediation_action == "reboot_ec2":
 
-        print(
-            "[Remediation Agent] "
-            "Executing approved EC2 reboot through MCP..."
-        )
+        if remediation_simulation_mode:
 
-        try:
-
-            result = _execute_reboot(
-                remediation_instance_id,
+            print(
+                "[Remediation Agent] "
+                "Running SAFE DEMO SIMULATION. "
+                "No AWS infrastructure will be modified."
             )
 
-            remediation_result = result.get(
-                "message",
-                "No MCP execution message returned.",
-            )
+            try:
 
-            if result.get("verified", False):
-
-                execution_status = (
-                    "EXECUTED - EC2 REBOOT VERIFIED THROUGH MCP"
+                result = _simulate_reboot(
+                    remediation_instance_id
                 )
 
-                verification_status = "VERIFIED"
+                remediation_result = result.get(
+                    "message",
+                    "Safe simulation completed.",
+                )
 
-                verification_message = (
-                    result.get(
-                        "message",
-                        "Recovery verified.",
+                if result.get(
+                    "verified",
+                    False,
+                ):
+
+                    execution_status = (
+                        "EXECUTED - EC2 REBOOT "
+                        "VERIFIED THROUGH SAFE SIMULATION"
                     )
-                )
 
-            else:
-
-                execution_status = "EXECUTION FAILED"
-
-                if result.get("executed", False):
-
-                    verification_status = "FAILED"
+                    verification_status = (
+                        "VERIFIED"
+                    )
 
                     verification_message = (
                         result.get(
                             "message",
-                            "Recovery verification failed.",
+                            "Safe simulated recovery verified.",
                         )
                     )
 
                 else:
 
-                    verification_status = "NOT RUN"
-
-                    verification_message = (
-                        "Execution did not complete. "
-                        "Recovery verification was not performed."
+                    execution_status = (
+                        "EXECUTION FAILED"
                     )
 
-        except Exception as exc:
+                    verification_status = (
+                        "FAILED"
+                    )
 
-            execution_status = "EXECUTION FAILED"
+                    verification_message = (
+                        result.get(
+                            "message",
+                            "Safe simulation failed.",
+                        )
+                    )
 
-            verification_status = "FAILED"
+            except Exception as exc:
 
-            verification_message = (
-                f"Remediation verification failed: {exc}"
+                execution_status = (
+                    "EXECUTION FAILED"
+                )
+
+                verification_status = (
+                    "FAILED"
+                )
+
+                verification_message = (
+                    f"Safe simulation failed: {exc}"
+                )
+
+                remediation_result = (
+                    f"Safe simulation failed: {exc}"
+                )
+
+        else:
+
+            print(
+                "[Remediation Agent] "
+                "Executing approved EC2 reboot through MCP..."
             )
 
-            remediation_result = (
-                "MCP remediation execution failed: "
-                f"{exc}"
-            )
+            try:
+
+                result = _execute_reboot(
+                    remediation_instance_id
+                )
+
+                remediation_result = result.get(
+                    "message",
+                    "No MCP execution message returned.",
+                )
+
+                if result.get(
+                    "verified",
+                    False,
+                ):
+
+                    execution_status = (
+                        "EXECUTED - EC2 REBOOT "
+                        "VERIFIED THROUGH MCP"
+                    )
+
+                    verification_status = (
+                        "VERIFIED"
+                    )
+
+                    verification_message = (
+                        result.get(
+                            "message",
+                            "Recovery verified.",
+                        )
+                    )
+
+                else:
+
+                    execution_status = (
+                        "EXECUTION FAILED"
+                    )
+
+                    if result.get(
+                        "executed",
+                        False,
+                    ):
+
+                        verification_status = (
+                            "FAILED"
+                        )
+
+                        verification_message = (
+                            result.get(
+                                "message",
+                                "Recovery verification failed.",
+                            )
+                        )
+
+                    else:
+
+                        verification_status = (
+                            "NOT RUN"
+                        )
+
+                        verification_message = (
+                            "Execution did not complete. "
+                            "Recovery verification was not performed."
+                        )
+
+            except Exception as exc:
+
+                execution_status = (
+                    "EXECUTION FAILED"
+                )
+
+                verification_status = (
+                    "FAILED"
+                )
+
+                verification_message = (
+                    f"Remediation verification failed: {exc}"
+                )
+
+                remediation_result = (
+                    "MCP remediation execution failed: "
+                    f"{exc}"
+                )
 
     else:
 
@@ -395,6 +569,12 @@ def remediation_agent(state: IncidentState) -> IncidentState:
     # --------------------------------------------------------
     # Final report
     # --------------------------------------------------------
+
+    simulation_label = (
+        "SAFE DEMO SIMULATION - NO AWS MODIFICATION"
+        if remediation_simulation_mode
+        else "REAL MCP CONTROLLED EXECUTION"
+    )
 
     remediation_plan = f"""
 ============================================================
@@ -429,6 +609,10 @@ TARGET INSTANCE
 ------------------------------------------------------------
 {remediation_instance_id or "NONE"}
 
+EXECUTION MODE
+------------------------------------------------------------
+{simulation_label}
+
 SAFETY ASSESSMENT
 ------------------------------------------------------------
 {safety_recommendation}
@@ -449,7 +633,7 @@ EXECUTION STATUS
 ------------------------------------------------------------
 {execution_status}
 
-MCP REMEDIATION RESULT
+MCP / SIMULATION RESULT
 ------------------------------------------------------------
 {remediation_result or "No remediation execution performed."}
 
@@ -474,22 +658,43 @@ AWS remediation requires:
 2. Human approval.
 3. Explicit remediation action.
 4. Explicit target resource.
-5. MCP-controlled execution.
+5. MCP-controlled execution when simulation is disabled.
 6. Successful post-remediation verification.
+
+Safe demo simulation never modifies AWS infrastructure.
 
 No arbitrary AWS command execution is permitted.
 
 ============================================================
 """
 
-    state["execution_status"] = execution_status
-    state["remediation_result"] = remediation_result
-    state["verification_status"] = verification_status
-    state["verification_message"] = verification_message
-    state["final_report"] = remediation_plan
+    state["execution_status"] = (
+        execution_status
+    )
+
+    state["remediation_result"] = (
+        remediation_result
+    )
+
+    state["verification_status"] = (
+        verification_status
+    )
+
+    state["verification_message"] = (
+        verification_message
+    )
+
+    state["remediation_dry_run"] = (
+        remediation_simulation_mode
+    )
+
+    state["final_report"] = (
+        remediation_plan
+    )
 
     print(
-        "[Remediation Agent] Remediation plan prepared."
+        "[Remediation Agent] "
+        "Remediation plan prepared."
     )
 
     return state
