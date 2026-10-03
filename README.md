@@ -1,69 +1,61 @@
-﻿# SRE Multi-Agent
+﻿# SRE Incident Response Platform
 
-AI-powered multi-agent SRE incident response system for investigating production incidents, performing root-cause analysis, retrieving historical incidents using RAG, validating remediation safety, and requiring human approval before controlled remediation.
+AI-powered SRE incident investigation and controlled remediation platform built with **LangGraph, FastAPI, Ollama, RAG, AWS CloudWatch, AWS MCP, Jira, and React/Vite**.
 
----
-
-## Overview
-
-SRE Multi-Agent combines multiple specialized AI agents into an incident investigation workflow.
-
-Instead of relying on a single LLM response, the system separates responsibilities across monitoring, log analysis, infrastructure analysis, RAG-based historical incident retrieval, root-cause analysis, safety validation, human approval, and remediation planning.
-
-The current v1.0 implementation is designed as a controlled SRE investigation platform.
-
-It does **not** automatically make destructive production changes.
+The platform is designed around a human-in-the-loop incident response workflow that investigates incidents, gathers evidence, performs root-cause analysis, validates remediation safety, requests explicit operator approval, performs controlled remediation, and verifies recovery.
 
 ---
 
 ## Architecture
 
 ```text
-                         Incident / Alert
-                               |
-                               v
-                      +-------------------+
-                      |    Orchestrator    |
-                      +---------+---------+
-                                |
-             +------------------+------------------+
-             |                  |                  |
-             v                  v                  v
-      +-------------+    +-------------+    +----------------+
-      |  Monitoring |    |     Log     |    | Infrastructure |
-      |    Agent    |    |    Agent    |    |     Agent      |
-      +------+------+    +------+------+    +-------+--------+
-             |                  |                    |
-             +------------------+--------------------+
-                                |
-                                v
-                         +-------------+
-                         |  RAG Agent  |
-                         +------+------+
-                                |
-                                v
-                         +-------------+
-                         |  RCA Agent  |
-                         +------+------+
-                                |
-                                v
-                       +----------------+
-                       |  Safety Agent  |
-                       +-------+--------+
-                               |
-                               v
-                      +------------------+
-                      | Human Approval   |
-                      +--------+---------+
-                               |
-                    +----------+----------+
-                    |                     |
-                 Approved               Rejected
-                    |                     |
-                    v                     v
-           +------------------+          END
-           | Remediation Agent|
-           +--------+---------+
-                    |
-                    v
-              Final Report
+AWS CloudWatch / Manual Incident
+              |
+              v
+       Incident Detection
+              |
+              v
+        Jira Incident
+              |
+              v
+       LangGraph Workflow
+              |
+      +-------+--------+
+      |       |        |
+      v       v        v
+    Logs   Metrics   Infrastructure
+      |       |        |
+      +-------+--------+
+              |
+              v
+          AWS MCP
+              |
+              v
+             RAG
+              |
+              v
+             RCA
+              |
+              v
+        Safety Gate
+              |
+              v
+       Jira IN REVIEW
+              |
+              v
+       Human Approval
+          /       \
+       Reject    Approve
+         |          |
+        END         v
+              Controlled
+              Remediation
+                   |
+                   v
+             Verification
+                   |
+                   v
+              Jira DONE
+                   |
+                   v
+             Final Report
