@@ -38,3 +38,13 @@ htmlcov/
 
 # Local UI backup
 ui/app.py.backup
+
+# SQLite runtime files
+*.db-shm
+*.db-wal
+
+# React / Vite
+web-ui/node_modules/
+web-ui/dist/
+web-ui/.vite/
+web-ui/src/App.jsx.backup
